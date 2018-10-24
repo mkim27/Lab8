@@ -45,7 +45,6 @@ public class MorseDecoder {
      */
     private static double[] binWavFilePower(final WavFile inputFile)
             throws IOException, WavFileException {
-
         /*
          * We should check the results of getNumFrames to ensure that they are safe to cast to int.
          */
@@ -55,7 +54,13 @@ public class MorseDecoder {
         double[] sampleBuffer = new double[BIN_SIZE * inputFile.getNumChannels()];
         for (int binIndex = 0; binIndex < totalBinCount; binIndex++) {
             // Get the right number of samples from the inputFile
+            int framesRead = inputFile.readFrames(sampleBuffer, BIN_SIZE);
+            returnBuffer[binIndex] = 0;
+
             // Sum all the samples together and store them in the returnBuffer
+            for (int sampleCount = 0; sampleCount < sampleBuffer.length; sampleCount++) {
+                returnBuffer[binIndex] += Math.abs(sampleBuffer[sampleCount]);
+            }
         }
         return returnBuffer;
     }
@@ -82,13 +87,46 @@ public class MorseDecoder {
          * There are four conditions to handle. Symbols should only be output when you see
          * transitions. You will also have to store how much power or silence you have seen.
          */
+        int sawPowerCount = 0;
+        String returnString = "";
+        for (int binIndex = 0; binIndex < powerMeasurements.length; binIndex++) {
+            double powerMeasurement = powerMeasurements[binIndex];
+            if (powerMeasurement > POWER_THRESHOLD) {
+                if (sawPowerCount < 0) {
+                    returnString += powerCountToDotDash(sawPowerCount);
+                    sawPowerCount = 0;
+                }
+                sawPowerCount++;
+            } else {
+                if (sawPowerCount > 0) {
+                    returnString += powerCountToDotDash(sawPowerCount);
+                    sawPowerCount = 0;
+                }
+            }
+            sawPowerCount--;
+        }
+        returnString += powerCountToDotDash(sawPowerCount);
+        return returnString;
+    }
 
-        // if ispower and waspower
-        // else if ispower and not waspower
-        // else if issilence and wassilence
-        // else if issilence and not wassilence
-
-        return "";
+    /**
+     * power count to dot dash function.
+     * @param powerCount is for count of powers.
+     * @return the corresponding morse character.
+     */
+    private static String powerCountToDotDash (final int powerCount) {
+       if (powerCount > 0) {
+           if (powerCount > DASH_BIN_COUNT) {
+               return "-";
+           } else {
+               return ".";
+           }
+       } else if (powerCount < 0) {
+           if (Math.abs(powerCount) > DASH_BIN_COUNT) {
+               return " ";
+           }
+       }
+       return "";
     }
 
     /**
